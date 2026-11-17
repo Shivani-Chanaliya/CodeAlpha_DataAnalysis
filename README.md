@@ -19,10 +19,10 @@ From this folder:
 
 ```powershell
 python -m pip install -r requirements.txt
-python eda_analysis.py
+streamlit run eda_analysis.py
 ```
 
-The summary and test result print to the terminal. The script saves `top_authors_chart.png` beside the input CSV.
+The app displays the data checks, charts, summaries, and hypothesis test. It saves `top_authors_chart.png` beside the input CSV.
 
 ## View results in Jupyter
 

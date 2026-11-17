@@ -5,6 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import streamlit as st
 
 
 PROJECT_DIR = Path(__file__).parent
@@ -85,48 +86,80 @@ def make_chart(data, output_file=CHART_FILE):
 
     figure.tight_layout()
     figure.savefig(output_file, dpi=200, bbox_inches="tight")
-    plt.close(figure)
+    return figure
 
 
 def main():
-    data, missing_rows, duplicate_rows, original_rows = load_quotes()
+    st.set_page_config(page_title="Quotes Exploratory Data Analysis", layout="wide")
+    st.title("Quotes Exploratory Data Analysis")
+    st.caption("An exploratory look at the collected quotes sample.")
+
+    try:
+        data, missing_rows, duplicate_rows, original_rows = load_quotes()
+    except (FileNotFoundError, ValueError) as error:
+        st.error(f"Unable to load the quotes dataset: {error}")
+        st.stop()
+
     data["word_count"] = data["quote"].str.split().str.len()
     data["character_count"] = data["quote"].str.len()
 
-    print("Questions")
-    print("- Which authors appear most often in this sample?")
-    print("- Are word count and character count associated?")
-    print("\nData structure")
-    print(f"Rows read: {original_rows}")
-    print(f"Rows with missing quote or author: {missing_rows}")
-    print(f"Duplicate quote-author rows: {duplicate_rows}")
-    print(f"Rows retained for analysis: {len(data)}")
-    print("\nColumn types")
-    print(data[["quote", "author", "word_count", "character_count"]].dtypes)
-    print("\nNumeric summary")
-    print(data[["word_count", "character_count"]].describe().round(2))
-    print("\nQuotes by author")
-    print(data["author"].value_counts().head(10).to_string())
+    st.subheader("Data quality")
+    metrics = st.columns(4)
+    metrics[0].metric("Rows read", f"{original_rows:,}")
+    metrics[1].metric("Rows retained", f"{len(data):,}")
+    metrics[2].metric("Rows with missing values", f"{missing_rows:,}")
+    metrics[3].metric("Duplicate quote-author rows", f"{duplicate_rows:,}")
+
+    chart_column, summary_column = st.columns((2, 1))
+    with chart_column:
+        st.subheader("Quote and author patterns")
+        figure = make_chart(data)
+        st.pyplot(figure)
+        plt.close(figure)
+
+    with summary_column:
+        st.subheader("Quotes by author")
+        author_counts = (
+            data["author"]
+            .value_counts()
+            .head(10)
+            .rename_axis("Author")
+            .reset_index(name="Quotes")
+        )
+        st.dataframe(author_counts, hide_index=True, width="stretch")
+        st.subheader("Numeric summary")
+        st.dataframe(
+            data[["word_count", "character_count"]].describe().round(2),
+            width="stretch",
+        )
 
     if len(data) >= 3:
         rho, p_value = spearman_permutation_test(
             data["word_count"].tolist(),
             data["character_count"].tolist(),
         )
-        print("\nHypothesis test: word count and character count")
-        print("H0: the two measures have no rank association.")
-        print("H1: the two measures have a rank association.")
-        print(f"Spearman rho: {rho:.3f}; two-sided permutation p-value: {p_value:.3f}")
+        st.subheader("Word count and character count")
+        result_columns = st.columns(2)
+        result_columns[0].metric("Spearman rank correlation", f"{rho:.3f}")
+        result_columns[1].metric("Two-sided permutation p-value", f"{p_value:.3f}")
         if p_value < 0.05:
-            print("At the 0.05 level, reject H0 for this sample.")
+            st.write("At the 0.05 level, reject the null hypothesis for this sample.")
         else:
-            print("At the 0.05 level, do not reject H0 for this sample.")
-        print("This exploratory result describes the scraped sample, not all quotations.")
+            st.write("At the 0.05 level, do not reject the null hypothesis for this sample.")
+        st.caption(
+            "This exploratory result describes the scraped sample, not all quotations."
+        )
     else:
-        print("\nNot enough rows to run the correlation hypothesis test (need at least 3).")
+        st.info("Not enough rows to run the correlation test; at least 3 are needed.")
 
-    make_chart(data)
-    print(f"\nChart saved to {CHART_FILE}")
+    with st.expander("View cleaned quote data"):
+        st.dataframe(
+            data[["quote", "author", "word_count", "character_count"]],
+            hide_index=True,
+            width="stretch",
+        )
+
+    st.caption(f"Chart saved to {CHART_FILE.name}")
 
 
 if __name__ == "__main__":
