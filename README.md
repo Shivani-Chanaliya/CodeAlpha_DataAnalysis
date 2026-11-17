@@ -18,7 +18,7 @@ The script requires `quote` and `author` columns, reports rows with missing valu
 From this folder:
 
 ```powershell
-python -m pip install pandas matplotlib seaborn
+python -m pip install -r requirements.txt
 python eda_analysis.py
 ```
 
